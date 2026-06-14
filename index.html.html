@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#185FA5" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<title>StockPro</title>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --blue: #185FA5; --blue-dark: #0C447C; --blue-light: #E6F1FB;
+    --green: #3B6D11; --green-light: #EAF3DE;
+    --amber: #BA7517; --amber-light: #FAEEDA;
+    --red: #A32D2D; --red-light: #FCEBEB;
+    --gray: #5F5E5A; --gray-light: #F1EFE8;
+    --bg: #fff; --bg2: #f7f7f5; --bg3: #f0f0ec;
+    --text: #1a1a18; --text2: #5F5E5A; --text3: #888780;
+    --border: rgba(0,0,0,0.12); --border2: rgba(0,0,0,0.22);
+    --radius: 10px; --radius-sm: 7px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a; --bg2: #242422; --bg3: #2c2c2a;
+      --text: #f0f0ec; --text2: #b4b2a9; --text3: #888780;
+      --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.2);
+      --blue-light: #042C53; --green-light: #173404;
+      --amber-light: #412402; --red-light: #501313; --gray-light: #2C2C2A;
+    }
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 16px; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+
+  /* Layout */
+  .app { display: flex; flex-direction: column; height: 100dvh; max-width: 600px; margin: 0 auto; }
+  .topbar { display: flex; align-items: center; gap: 10px; padding: 12px 16px 10px; border-bottom: 0.5px solid var(--border); background: var(--bg); position: sticky; top: 0; z-index: 10; }
+  .logo { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; color: var(--blue); }
+  .logo svg { width: 22px; height: 22px; }
+  .topbar-right { margin-left: auto; display: flex; gap: 6px; }
+  .icon-btn { width: 36px; height: 36px; border: 0.5px solid var(--border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; color: var(--text2); font-size: 18px; transition: background 0.15s; }
+  .icon-btn:active { background: var(--bg2); }
+
+  .main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Bottom nav */
+  .bottom-nav { display: flex; border-top: 0.5px solid var(--border); background: var(--bg); padding-bottom: env(safe-area-inset-bottom, 0); }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 4px 8px; cursor: pointer; color: var(--text3); font-size: 10px; border: none; background: none; transition: color 0.15s; }
+  .nav-item svg { width: 22px; height: 22px; }
+  .nav-item.active { color: var(--blue); }
+  .nav-item.active .nav-dot { width: 4px; height: 4px; background: var(--blue); border-radius: 50%; display: block; }
+
+  /* Panels */
+  .panel { display: none; padding: 14px 16px; }
+  .panel.active { display: block; }
+
+  /* Stats row */
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .stat { background: var(--bg2); border-radius: var(--radius); padding: 12px 14px; }
+  .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+  .stat-val { font-size: 24px; font-weight: 600; line-height: 1; }
+  .stat-val.blue { color: var(--blue); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.red { color: var(--red); }
+
+  /* Search */
+  .search-wrap { position: relative; margin-bottom: 10px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text3); pointer-events: none; }
+  .search-input { width: 100%; padding: 10px 12px 10px 34px; font-size: 15px; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg2); color: var(--text); outline: none; }
+  .search-input:focus { border-color: var(--blue); }
+
+  /* Filters */
+  .filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; margin-bottom: 12px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-chip { white-space: nowrap; padding: 5px 12px; border: 0.5px solid var(--border); border-radius: 100px; font-size: 13px; cursor: pointer; background: transparent; color: var(--text2); transition: all 0.15s; }
+  .filter-chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  /* Article cards */
+  .article-list { display: flex; flex-direction: column; gap: 8px; }
+  .article-card { background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; transition: background 0.1s; }
+  .article-card:active { background: var(--bg2); }
+  .article-card.out { border-left: 3px solid var(--red); }
+  .article-card.low { border-left: 3px solid var(--amber); }
+  .ac-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .ac-name { font-size: 15px; font-weight: 500; }
+  .ac-ref { font-size: 11px; color: var(--text3); font-family: monospace; margin-top: 2px; }
+  .ac-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+  .ac-cat { font-size: 12px; color: var(--text2); background: var(--bg2); padding: 2px 8px; border-radius: 100px; }
+  .ac-qty { display: flex; align-items: baseline; gap: 4px; }
+  .ac-qty-val { font-size: 20px; font-weight: 600; }
+  .ac-price { font-size: 13px; color: var(--text2); }
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 100px; font-size: 11px; font-weight: 500; }
+  .badge-ok { background: var(--green-light); color: var(--green); }
+  .badge-low { background: var(--amber-light); color: var(--amber); }
+  .badge-out { background: var(--red-light); color: var(--red); }
+
+  /* Empty */
+  .empty { text-align: center; padding: 48px 20px; color: var(--text3); }
+  .empty svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4; }
+  .empty p { font-size: 14px; }
+
+  /* FAB */
+  .fab { position: fixed; bottom: calc(70px + env(safe-area-inset-bottom, 0)); right: 20px; width: 54px; height: 54px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 12px rgba(24,95,165,0.4); cursor: pointer; border: none; z-index: 20; transition: transform 0.15s, background 0.15s; }
+  .fab:active { transform: scale(0.95); background: var(--blue-dark); }
+  .fab svg { width: 24px; height: 24px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 16px; font-size: 14px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); cursor: pointer; background: transparent; color: var(--text); transition: all 0.15s; font-weight: 500; }
+  .btn:active { background: var(--bg2); }
+  .btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn-primary:active { background: var(--blue-dark); }
+  .btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
+  .btn-block { width: 100%; }
+  .btn-sm { padding: 7px 12px; font-size: 13px; }
+
+  /* Modal / Bottom sheet */
+  .sheet-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; }
+  .sheet-bg.open { display: block; }
+  .sheet { position: fixed; bottom: 0; left: 0; right: 0; max-width: 600px; margin: 0 auto; background: var(--bg); border-radius: 20px 20px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0)); z-index: 101; max-height: 92dvh; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.32,0.72,0,1); }
+  .sheet.open { transform: translateY(0); }
+  .sheet-handle { width: 36px; height: 4px; background: var(--border2); border-radius: 2px; margin: 0 auto 18px; }
+  .sheet-title { font-size: 17px; font-weight: 600; margin-bottom: 18px; }
+  .form-row { margin-bottom: 14px; }
+  .form-row label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 5px; font-weight: 500; }
+  .form-row input, .form-row select { width: 100%; padding: 11px 13px; font-size: 16px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text); outline: none; -webkit-appearance: none; }
+  .form-row input:focus, .form-row select:focus { border-color: var(--blue); }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .sheet-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .sheet-actions .btn { flex: 1; }
+
+  /* Article detail sheet */
+  .detail-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+  .detail-name { font-size: 18px; font-weight: 600; }
+  .detail-ref { font-size: 12px; color: var(--text3); font-family: monospace; margin-top: 3px; }
+  .detail-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 18px; }
+  .detail-stat { background: var(--bg2); border-radius: var(--radius-sm); padding: 10px 12px; text-align: center; }
+  .detail-stat-val { font-size: 20px; font-weight: 600; }
+  .detail-stat-label { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .detail-actions { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Mouvement inline */
+  .mvt-row { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .mvt-row select, .mvt-row input[type=number] { padding: 10px 12px; font-size: 15px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text); -webkit-appearance: none; }
+  .mvt-row select { flex: 1; min-width: 130px; }
+  .mvt-row input[type=number] { width: 90px; }
+
+  /* Scanner */
+  .scanner-box { background: #000; border-radius: var(--radius); overflow: hidden; position: relative; height: 280px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+  /* Conteneur interne html5-qrcode */
+  #qr-reader { position: absolute; inset: 0; width: 100% !important; height: 100% !important; border: none !important; }
+  #qr-reader video { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important; }
+  /* Masquer tout ce qu'html5-qrcode injecte sauf la vidéo */
+  #qr-reader img, #qr-reader select, #qr-reader button,
+  #qr-reader > div:not(:has(video)) { display: none !important; }
+  #qr-reader__scan_region { border: none !important; }
+  .scanner-msg { color: #fff; font-size: 14px; text-align: center; position: absolute; bottom: 16px; left: 0; right: 0; opacity: 0.8; pointer-events: none; z-index: 4; }
+  .scanner-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+  .scanner-overlay::before, .scanner-overlay::after { content: ''; position: absolute; width: 28px; height: 28px; border-color: #fff; border-style: solid; border-width: 0; }
+  .scanner-overlay::before { top: 20px; left: 20px; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+  .scanner-overlay::after { bottom: 20px; right: 20px; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+  #scan-line { position: absolute; left: 10%; right: 10%; height: 2px; background: var(--blue); border-radius: 1px; animation: scanmove 2s ease-in-out infinite; top: 50%; z-index: 3; pointer-events: none; display: none; }
+  @keyframes scanmove { 0%,100% { transform: translateY(-80px); opacity: 0.4; } 50% { transform: translateY(80px); opacity: 1; } }
+  #scan-status { font-size: 14px; color: var(--text2); text-align: center; margin-bottom: 14px; padding: 10px; background: var(--bg2); border-radius: var(--radius-sm); min-height: 42px; display: flex; align-items: center; justify-content: center; }
+  #scan-status.success { color: var(--green); background: var(--green-light); font-weight: 500; }
+  #scan-status.error { color: var(--red); background: var(--red-light); }
+
+  /* Found product */
+  .found-card { background: var(--bg2); border-radius: var(--radius); padding: 14px; margin-top: 12px; display: none; }
+  .found-card.visible { display: block; }
+  .found-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .found-name { font-size: 16px; font-weight: 600; }
+  .found-ref { font-size: 11px; font-family: monospace; color: var(--text3); margin-top: 2px; }
+  .found-vals { display: flex; gap: 16px; font-size: 13px; color: var(--text2); margin-bottom: 12px; }
+  .found-qty { font-size: 24px; font-weight: 700; color: var(--blue); }
+
+  /* Manual input */
+  .manual-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .manual-row input { flex: 1; padding: 11px 13px; font-size: 15px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg2); color: var(--text); }
+
+  /* Barcode section */
+  .section-card { background: var(--bg2); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .section-title { font-size: 14px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+  #barcode-preview { text-align: center; padding: 16px; background: #fff; border-radius: var(--radius-sm); min-height: 80px; display: flex; align-items: center; justify-content: center; }
+  #barcode-preview svg { max-width: 100%; }
+  .bc-form-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .bc-form-row input { flex: 1; min-width: 140px; padding: 10px 12px; font-size: 15px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); }
+  .bc-form-row select { padding: 10px 12px; font-size: 14px; border: 0.5px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg); color: var(--text); -webkit-appearance: none; }
+  .bc-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+  /* Movements list */
+  .mvt-list { display: flex; flex-direction: column; gap: 8px; }
+  .mvt-item { display: flex; align-items: center; gap: 12px; background: var(--bg); border: 0.5px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .mvt-dot { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mvt-dot.in { background: var(--green-light); color: var(--green); }
+  .mvt-dot.out { background: var(--red-light); color: var(--red); }
+  .mvt-dot svg { width: 18px; height: 18px; }
+  .mvt-body { flex: 1; }
+  .mvt-name { font-size: 14px; font-weight: 500; }
+  .mvt-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .mvt-amount { font-size: 15px; font-weight: 600; }
+  .mvt-amount.in { color: var(--green); }
+  .mvt-amount.out { color: var(--red); }
+
+  /* Toast */
+  .toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%) translateY(-20px); background: #222; color: #fff; padding: 10px 18px; border-radius: 100px; font-size: 14px; opacity: 0; transition: all 0.3s; z-index: 200; pointer-events: none; white-space: nowrap; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (min-width: 480px) {
+    .stats-row { grid-template-columns: repeat(4, 1fr); }
+    .article-list { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      StockPro
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" onclick="exportData()" title="Exporter JSON">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+      <label class="icon-btn" title="Importer JSON" style="cursor:pointer;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <input type="file" accept=".json" style="display:none;" onchange="importData(event)" />
+      </label>
+    </div>
+  </div>
+
+  <!-- Main scrollable -->
+  <div class="main" id="main">
+
+    <!-- STOCK PANEL -->
+    <div class="panel active" id="panel-stock">
+      <div class="stats-row">
+        <div class="stat"><div class="stat-label">Articles</div><div class="stat-val blue" id="s-total">0</div></div>
+        <div class="stat"><div class="stat-label">Valeur</div><div class="stat-val green" id="s-valeur">0 €</div></div>
+        <div class="stat"><div class="stat-label">Faible</div><div class="stat-val amber" id="s-low">0</div></div>
+        <div class="stat"><div class="stat-label">Rupture</div><div class="stat-val red" id="s-out">0</div></div>
+      </div>
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" type="text" id="search-input" placeholder="Rechercher nom, réf, code-barres..." oninput="renderStock()" autocomplete="off" />
+      </div>
+      <div class="filters" id="cat-filters"></div>
+      <div class="article-list" id="article-list"></div>
+      <div class="empty" id="stock-empty" style="display:none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        <p>Aucun article trouvé</p>
+      </div>
+    </div>
+
+    <!-- SCANNER PANEL -->
+    <div class="panel" id="panel-scanner">
+      <div class="scanner-box" id="scanner-box">
+        <div class="scanner-overlay"></div>
+        <div id="scan-line" style="display:none;"></div>
+        <div class="scanner-msg" id="scanner-msg">Appuyez sur Démarrer</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <button class="btn btn-primary" id="btn-start" onclick="startScan()" style="flex:1;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Démarrer la caméra
+        </button>
+        <button class="btn" id="btn-stop" onclick="stopScan()" style="flex:1;display:none;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+          Arrêter
+        </button>
+      </div>
+      <div id="scan-status">En attente…</div>
+      <div class="manual-row">
+        <input type="text" id="manual-code" placeholder="Ou saisir un code manuellement..." />
+        <button class="btn btn-primary btn-sm" onclick="manualSearch()">Chercher</button>
+      </div>
+      <div class="found-card" id="found-card">
+        <div class="found-top">
+          <div>
+            <div class="found-name" id="found-name"></div>
+            <div class="found-ref" id="found-ref"></div>
+          </div>
+          <div id="found-badge"></div>
+        </div>
+        <div class="found-vals">
+          <div><div class="found-qty" id="found-qty"></div><div style="font-size:11px;color:var(--text3);">en stock</div></div>
+          <div><div style="font-size:16px;font-weight:500;" id="found-price"></div><div style="font-size:11px;color:var(--text3);">prix HT</div></div>
+          <div><div style="font-size:16px;" id="found-cat"></div><div style="font-size:11px;color:var(--text3);">catégorie</div></div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-primary btn-sm" onclick="quickMvt('in')" style="flex:1;">+ Entrée</button>
+          <button class="btn btn-sm" style="flex:1;border-color:var(--red);color:var(--red);" onclick="quickMvt('out')">− Sortie</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BARCODE PANEL -->
+    <div class="panel" id="panel-barcode">
+      <div class="section-card">
+        <div class="section-title">Générer un code-barres</div>
+        <div class="bc-form-row">
+          <input type="text" id="bc-value" placeholder="Valeur (ex: 3760000000010)" value="3760000000010" />
+          <select id="bc-format">
+            <option value="CODE128">Code 128</option>
+            <option value="EAN13">EAN-13</option>
+            <option value="EAN8">EAN-8</option>
+            <option value="CODE39">Code 39</option>
+            <option value="UPC">UPC-A</option>
+            <option value="ITF14">ITF-14</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="generateBarcode()">Générer l'aperçu</button>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Aperçu</div>
+        <div id="barcode-preview"><span style="color:var(--text3);font-size:13px;">Aucun code généré</span></div>
+        <div class="bc-actions" id="bc-actions" style="display:none;">
+          <button class="btn btn-sm" onclick="downloadBarcode()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Télécharger SVG
+          </button>
+          <button class="btn btn-sm" onclick="printBarcode()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Imprimer
+          </button>
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title">Depuis un article du stock</div>
+        <select id="bc-article-sel" style="width:100%;padding:11px 13px;font-size:15px;border:0.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);-webkit-appearance:none;margin-bottom:10px;">
+          <option value="">Choisir un article…</option>
+        </select>
+        <button class="btn btn-primary btn-block" onclick="generateFromArticle()">Générer depuis cet article</button>
+      </div>
+    </div>
+
+    <!-- MOUVEMENTS PANEL -->
+    <div class="panel" id="panel-mouvements">
+      <div class="mvt-list" id="mvt-list"></div>
+      <div class="empty" id="mvt-empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <p>Aucun mouvement enregistré</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" id="nav-stock" onclick="showPanel('stock')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8L6 7h12l-2-4z"/></svg>
+      <span>Stock</span>
+    </button>
+    <button class="nav-item" id="nav-scanner" onclick="showPanel('scanner')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><line x1="21" y1="21" x2="21" y2="21"/><path d="M3 11h3"/><path d="M12 3v3"/><path d="M12 8v1"/><path d="M12 12h9"/><path d="M12 16v5"/></svg>
+      <span>Scanner</span>
+    </button>
+    <button class="nav-item" id="nav-barcode" onclick="showPanel('barcode')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14"/><rect x="1" y="3" width="22" height="18" rx="2"/></svg>
+      <span>Codes-barres</span>
+    </button>
+    <button class="nav-item" id="nav-mouvements" onclick="showPanel('mouvements')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+      <span>Mouvements</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="openAddSheet()" id="fab" title="Ajouter un article">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+</button>
+
+<!-- Sheet: Add/Edit article -->
+<div class="sheet-bg" id="bg-add" onclick="closeSheet('add')"></div>
+<div class="sheet" id="sheet-add">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title" id="add-title">Nouvel article</div>
+  <div class="form-row"><label>Référence / Code-barres</label><input type="text" id="f-ref" placeholder="ex: ART-001 ou 3760000000010" autocomplete="off" /></div>
+  <div class="form-row"><label>Désignation</label><input type="text" id="f-name" placeholder="Nom du produit" /></div>
+  <div class="form-row"><label>Catégorie</label><input type="text" id="f-cat" placeholder="ex: Électronique, Papeterie…" /></div>
+  <div class="form-grid">
+    <div class="form-row"><label>Quantité</label><input type="number" id="f-qty" value="0" min="0" inputmode="numeric" /></div>
+    <div class="form-row"><label>Seuil alerte</label><input type="number" id="f-threshold" value="5" min="0" inputmode="numeric" /></div>
+    <div class="form-row"><label>Prix HT (€)</label><input type="number" id="f-price" value="0" step="0.01" inputmode="decimal" /></div>
+  </div>
+  <div class="sheet-actions">
+    <button class="btn" onclick="closeSheet('add')">Annuler</button>
+    <button class="btn btn-primary" onclick="saveArticle()">Enregistrer</button>
+  </div>
+</div>
+
+<!-- Sheet: Article detail -->
+<div class="sheet-bg" id="bg-detail" onclick="closeSheet('detail')"></div>
+<div class="sheet" id="sheet-detail">
+  <div class="sheet-handle"></div>
+  <div class="detail-header">
+    <div><div class="detail-name" id="d-name"></div><div class="detail-ref" id="d-ref"></div></div>
+    <span class="badge" id="d-badge"></span>
+  </div>
+  <div class="detail-stats">
+    <div class="detail-stat"><div class="detail-stat-val blue" id="d-qty"></div><div class="detail-stat-label">En stock</div></div>
+    <div class="detail-stat"><div class="detail-stat-val amber" id="d-threshold"></div><div class="detail-stat-label">Seuil alerte</div></div>
+    <div class="detail-stat"><div class="detail-stat-val green" id="d-price"></div><div class="detail-stat-label">Prix HT</div></div>
+  </div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:14px;" id="d-valeur"></div>
+  <div style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--text2);">Mouvement de stock</div>
+  <div class="mvt-row">
+    <select id="d-mvt-type">
+      <option value="in">+ Entrée</option>
+      <option value="out">− Sortie</option>
+    </select>
+    <input type="number" id="d-mvt-qty" value="1" min="1" inputmode="numeric" />
+    <button class="btn btn-primary btn-sm" onclick="applyMvt()">Valider</button>
+  </div>
+  <div class="form-row"><label>Motif (optionnel)</label><input type="text" id="d-mvt-reason" placeholder="ex: Commande fournisseur, Vente…" /></div>
+  <div class="detail-actions">
+    <button class="btn" onclick="editCurrentArticle()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Modifier
+    </button>
+    <button class="btn" onclick="genBarcodeFromDetail()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14"/><rect x="1" y="3" width="22" height="18" rx="2"/></svg>
+      Code-barres
+    </button>
+    <button class="btn btn-danger" onclick="deleteCurrentArticle()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+      Supprimer
+    </button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+let stock = JSON.parse(localStorage.getItem('stockpro-stock') || 'null') || [
+  { id:1, ref:"3760155120156", name:"Stylo Bille Noir", cat:"Papeterie", qty:120, threshold:20, price:0.45 },
+  { id:2, ref:"3329689002093", name:"Ramette A4 80g", cat:"Papeterie", qty:8, threshold:10, price:4.90 },
+  { id:3, ref:"5010161000050", name:"Câble USB-C", cat:"Électronique", qty:0, threshold:5, price:12.99 },
+  { id:4, ref:"8712100780431", name:"Agrafeuse de bureau", cat:"Papeterie", qty:34, threshold:5, price:8.50 },
+  { id:5, ref:"3380380041610", name:"Souris sans fil", cat:"Électronique", qty:15, threshold:5, price:24.99 },
+];
+let movements = JSON.parse(localStorage.getItem('stockpro-mvt') || '[]');
+let nextId = Math.max(0, ...stock.map(i=>i.id)) + 1;
+let editId = null;
+let currentDetailId = null;
+let scanActive = false;
+let currentCat = '';
+let foundArticleId = null;
+
+function save() {
+  localStorage.setItem('stockpro-stock', JSON.stringify(stock));
+  localStorage.setItem('stockpro-mvt', JSON.stringify(movements));
+}
+
+function toast(msg, duration=2200) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function getStatus(item) {
+  if (item.qty === 0) return { label:'Rupture', cls:'badge-out' };
+  if (item.qty <= item.threshold) return { label:'Stock faible', cls:'badge-low' };
+  return { label:'OK', cls:'badge-ok' };
+}
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  const fab = document.getElementById('fab');
+  fab.style.display = name === 'stock' ? 'flex' : 'none';
+  if (name !== 'scanner') stopScan();
+  if (name === 'barcode') populateBcSelect();
+}
+
+// ---- STOCK ----
+function renderStock() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  let rows = stock.filter(i =>
+    (!q || i.ref.toLowerCase().includes(q) || i.name.toLowerCase().includes(q) || i.cat.toLowerCase().includes(q)) &&
+    (!currentCat || i.cat === currentCat)
+  );
+  const list = document.getElementById('article-list');
+  list.innerHTML = rows.map(i => {
+    const s = getStatus(i);
+    const cls = i.qty === 0 ? 'out' : (i.qty <= i.threshold ? 'low' : '');
+    return `<div class="article-card ${cls}" onclick="openDetail(${i.id})">
+      <div class="ac-top">
+        <div><div class="ac-name">${i.name}</div><div class="ac-ref">${i.ref}</div></div>
+        <span class="badge ${s.cls}">${s.label}</span>
+      </div>
+      <div class="ac-bottom">
+        <span class="ac-cat">${i.cat}</span>
+        <div class="ac-qty"><span class="ac-qty-val">${i.qty}</span><span class="ac-price">/ ${i.price.toFixed(2)}€</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('stock-empty').style.display = rows.length ? 'none' : 'block';
+  updateStats();
+  renderCatFilters();
+}
+
+function updateStats() {
+  document.getElementById('s-total').textContent = stock.length;
+  const val = stock.reduce((a,i) => a + i.qty * i.price, 0);
+  document.getElementById('s-valeur').textContent = val.toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0}) + ' €';
+  document.getElementById('s-low').textContent = stock.filter(i => i.qty > 0 && i.qty <= i.threshold).length;
+  document.getElementById('s-out').textContent = stock.filter(i => i.qty === 0).length;
+}
+
+function renderCatFilters() {
+  const cats = [...new Set(stock.map(i => i.cat))];
+  document.getElementById('cat-filters').innerHTML =
+    `<button class="filter-chip ${!currentCat?'active':''}" onclick="setCat('')">Tous</button>` +
+    cats.map(c => `<button class="filter-chip ${c===currentCat?'active':''}" onclick="setCat('${c.replace(/'/g,"\\'")}')">  ${c}</button>`).join('');
+}
+
+function setCat(c) { currentCat = c; renderStock(); }
+
+// ---- MODALS ----
+function openSheet(name) {
+  document.getElementById('bg-'+name).classList.add('open');
+  setTimeout(() => document.getElementById('sheet-'+name).classList.add('open'), 10);
+}
+function closeSheet(name) {
+  document.getElementById('sheet-'+name).classList.remove('open');
+  setTimeout(() => document.getElementById('bg-'+name).classList.remove('open'), 300);
+}
+
+function openAddSheet() {
+  editId = null;
+  document.getElementById('add-title').textContent = 'Nouvel article';
+  ['ref','name','cat'].forEach(f => document.getElementById('f-'+f).value = '');
+  document.getElementById('f-qty').value = 0;
+  document.getElementById('f-threshold').value = 5;
+  document.getElementById('f-price').value = 0;
+  openSheet('add');
+}
+
+function saveArticle() {
+  const ref = document.getElementById('f-ref').value.trim();
+  const name = document.getElementById('f-name').value.trim();
+  if (!ref || !name) { toast('Référence et nom obligatoires'); return; }
+  const art = { ref, name, cat: document.getElementById('f-cat').value.trim() || 'Divers', qty: parseInt(document.getElementById('f-qty').value)||0, threshold: parseInt(document.getElementById('f-threshold').value)||5, price: parseFloat(document.getElementById('f-price').value)||0 };
+  if (editId) {
+    const idx = stock.findIndex(x => x.id === editId);
+    stock[idx] = { ...stock[idx], ...art };
+    toast('Article modifié');
+  } else {
+    stock.push({ id: nextId++, ...art });
+    toast('Article ajouté');
+  }
+  save(); closeSheet('add'); renderStock();
+  if (editId && currentDetailId === editId) openDetail(editId);
+}
+
+function openDetail(id) {
+  currentDetailId = id;
+  const i = stock.find(x => x.id === id);
+  const s = getStatus(i);
+  document.getElementById('d-name').textContent = i.name;
+  document.getElementById('d-ref').textContent = i.ref;
+  document.getElementById('d-badge').className = 'badge ' + s.cls;
+  document.getElementById('d-badge').textContent = s.label;
+  document.getElementById('d-qty').textContent = i.qty;
+  document.getElementById('d-threshold').textContent = i.threshold;
+  document.getElementById('d-price').textContent = i.price.toFixed(2) + ' €';
+  document.getElementById('d-valeur').textContent = 'Valeur totale : ' + (i.qty * i.price).toFixed(2) + ' €';
+  document.getElementById('d-mvt-qty').value = 1;
+  document.getElementById('d-mvt-reason').value = '';
+  openSheet('detail');
+}
+
+function applyMvt() {
+  const id = currentDetailId;
+  const type = document.getElementById('d-mvt-type').value;
+  const qty = parseInt(document.getElementById('d-mvt-qty').value) || 1;
+  const reason = document.getElementById('d-mvt-reason').value.trim();
+  const idx = stock.findIndex(x => x.id === id);
+  if (type === 'out' && qty > stock[idx].qty) { toast('Quantité insuffisante en stock'); return; }
+  stock[idx].qty += (type === 'in' ? qty : -qty);
+  movements.unshift({ id: Date.now(), articleId: id, name: stock[idx].name, type, qty, reason, date: new Date().toLocaleString('fr-FR') });
+  save(); renderStock(); renderMvt();
+  openDetail(id);
+  toast((type==='in'?'+':'-') + qty + ' — ' + stock[idx].name);
+}
+
+function editCurrentArticle() {
+  const i = stock.find(x => x.id === currentDetailId);
+  editId = currentDetailId;
+  document.getElementById('add-title').textContent = 'Modifier l\'article';
+  document.getElementById('f-ref').value = i.ref;
+  document.getElementById('f-name').value = i.name;
+  document.getElementById('f-cat').value = i.cat;
+  document.getElementById('f-qty').value = i.qty;
+  document.getElementById('f-threshold').value = i.threshold;
+  document.getElementById('f-price').value = i.price;
+  closeSheet('detail');
+  setTimeout(() => openSheet('add'), 320);
+}
+
+function deleteCurrentArticle() {
+  if (!confirm('Supprimer cet article ?')) return;
+  stock = stock.filter(x => x.id !== currentDetailId);
+  save(); closeSheet('detail'); renderStock();
+  toast('Article supprimé');
+}
+
+function genBarcodeFromDetail() {
+  const i = stock.find(x => x.id === currentDetailId);
+  closeSheet('detail');
+  setTimeout(() => {
+    showPanel('barcode');
+    document.getElementById('bc-value').value = i.ref;
+    document.getElementById('bc-format').value = 'CODE128';
+    generateBarcode();
+  }, 320);
+}
+
+// ---- MOUVEMENTS ----
+function renderMvt() {
+  const list = document.getElementById('mvt-list');
+  document.getElementById('mvt-empty').style.display = movements.length ? 'none' : 'block';
+  list.innerHTML = movements.slice(0, 80).map(m => `
+    <div class="mvt-item">
+      <div class="mvt-dot ${m.type}">
+        ${m.type==='in'
+          ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>'
+          : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>'}
+      </div>
+      <div class="mvt-body">
+        <div class="mvt-name">${m.name}</div>
+        <div class="mvt-meta">${m.reason || (m.type==='in'?'Entrée stock':'Sortie stock')} · ${m.date}</div>
+      </div>
+      <div class="mvt-amount ${m.type}">${m.type==='in'?'+':'-'}${m.qty}</div>
+    </div>`).join('');
+}
+
+// ---- SCANNER ----
+let html5QrScanner = null;
+let scanStream = null;
+let lastCode = '', lastTime = 0;
+
+function startScan() {
+  const status = document.getElementById('scan-status');
+
+  // Vérification HTTPS / localhost (requis par Chrome Android)
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+    status.textContent = '⚠️ HTTPS requis pour la caméra. Ouvrez la page en HTTPS.';
+    status.className = 'error';
+    return;
+  }
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    status.textContent = 'Caméra non disponible sur ce navigateur.';
+    status.className = 'error';
+    return;
+  }
+
+  status.textContent = 'Demande d\'accès à la caméra…';
+  status.className = '';
+
+  // Créer un élément <div> dédié au scanner DANS scanner-box (html5-qrcode en a besoin)
+  const box = document.getElementById('scanner-box');
+  box.innerHTML = '<div id="qr-reader"></div><div class="scanner-overlay"></div><div id="scan-line"></div><div class="scanner-msg" id="scanner-msg">Pointez vers un code-barres</div>';
+
+  html5QrScanner = new Html5Qrcode('qr-reader', { verbose: false });
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 240, height: 130 },
+    aspectRatio: 1.333,
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.QR_CODE,
+    ]
+  };
+
+  html5QrScanner.start(
+    { facingMode: 'environment' },
+    config,
+    (decodedText) => {
+      const now = Date.now();
+      if (decodedText === lastCode && now - lastTime < 2000) return;
+      lastCode = decodedText; lastTime = now;
+      handleCode(decodedText);
+    },
+    () => {} // erreurs par frame ignorées (normal)
+  ).then(() => {
+    scanActive = true;
+    document.getElementById('btn-start').style.display = 'none';
+    document.getElementById('btn-stop').style.display = 'flex';
+    status.textContent = 'Scanner actif — pointez vers un code-barres';
+    status.className = '';
+    const line = document.getElementById('scan-line');
+    if (line) line.style.display = 'block';
+    // Masquer l'UI parasite injectée par html5-qrcode
+    const qrReader = document.getElementById('qr-reader');
+    if (qrReader) {
+      const parasites = qrReader.querySelectorAll('img, select, span[style], div[style*="border"]');
+      parasites.forEach(el => {
+        if (!el.tagName.match(/VIDEO/i)) el.style.display = 'none';
+      });
+      // Forcer la vidéo à remplir le conteneur
+      const vid = qrReader.querySelector('video');
+      if (vid) {
+        vid.style.cssText = 'width:100%!important;height:280px!important;object-fit:cover!important;border-radius:0!important;';
+      }
+    }
+  }).catch(err => {
+    const msg = err && err.message ? err.message : String(err);
+    if (msg.includes('NotAllowedError') || msg.includes('Permission')) {
+      status.textContent = '🚫 Permission caméra refusée. Autorisez la caméra dans les réglages Chrome.';
+    } else if (msg.includes('NotFoundError') || msg.includes('Requested device not found')) {
+      status.textContent = '📷 Aucune caméra détectée sur cet appareil.';
+    } else if (msg.includes('NotReadableError') || msg.includes('Could not start')) {
+      status.textContent = '⚠️ Caméra occupée par une autre application. Fermez-la et réessayez.';
+    } else {
+      status.textContent = 'Erreur : ' + msg;
+    }
+    status.className = 'error';
+    html5QrScanner = null;
+    _resetScannerBox();
+  });
+}
+
+function stopScan() {
+  if (html5QrScanner) {
+    html5QrScanner.stop().catch(() => {}).finally(() => {
+      try { html5QrScanner.clear(); } catch(e) {}
+      html5QrScanner = null;
+      scanActive = false;
+      _resetScannerBox();
+    });
+  } else {
+    scanActive = false;
+    _resetScannerBox();
+  }
+}
+
+function _resetScannerBox() {
+  document.getElementById('btn-start').style.display = 'flex';
+  document.getElementById('btn-stop').style.display = 'none';
+  const box = document.getElementById('scanner-box');
+  box.innerHTML = '<div class="scanner-overlay"></div><div class="scanner-msg" id="scanner-msg">Appuyez sur Démarrer</div>';
+}
+
+function handleCode(code) {
+  const item = stock.find(i => i.ref === code);
+  const status = document.getElementById('scan-status');
+  const card = document.getElementById('found-card');
+  if (item) {
+    const s = getStatus(item);
+    status.textContent = '✓ Article trouvé : ' + code;
+    status.className = 'success';
+    foundArticleId = item.id;
+    document.getElementById('found-name').textContent = item.name;
+    document.getElementById('found-ref').textContent = item.ref;
+    document.getElementById('found-qty').textContent = item.qty;
+    document.getElementById('found-price').textContent = item.price.toFixed(2) + ' €';
+    document.getElementById('found-cat').textContent = item.cat;
+    document.getElementById('found-badge').innerHTML = `<span class="badge ${s.cls}">${s.label}</span>`;
+    card.classList.add('visible');
+  } else {
+    status.textContent = 'Code : ' + code + ' — non trouvé dans le stock';
+    status.className = 'error';
+    card.classList.remove('visible');
+    foundArticleId = null;
+  }
+}
+
+function manualSearch() {
+  const code = document.getElementById('manual-code').value.trim();
+  if (!code) return;
+  handleCode(code);
+}
+
+function quickMvt(type) {
+  if (!foundArticleId) return;
+  const idx = stock.findIndex(x => x.id === foundArticleId);
+  if (type === 'out' && stock[idx].qty < 1) { toast('Stock insuffisant'); return; }
+  stock[idx].qty += (type === 'in' ? 1 : -1);
+  movements.unshift({ id: Date.now(), articleId: foundArticleId, name: stock[idx].name, type, qty: 1, reason: 'Via scanner', date: new Date().toLocaleString('fr-FR') });
+  save(); renderMvt();
+  document.getElementById('found-qty').textContent = stock[idx].qty;
+  const s = getStatus(stock[idx]);
+  document.getElementById('found-badge').innerHTML = `<span class="badge ${s.cls}">${s.label}</span>`;
+  toast((type==='in'?'+1':'-1') + ' ' + stock[idx].name);
+}
+
+// ---- BARCODE ----
+function generateBarcode() {
+  const val = document.getElementById('bc-value').value.trim();
+  const fmt = document.getElementById('bc-format').value;
+  if (!val) { toast('Entrez une valeur'); return; }
+  const preview = document.getElementById('barcode-preview');
+  preview.innerHTML = '<svg id="bc-svg"></svg>';
+  try {
+    JsBarcode('#bc-svg', val, { format: fmt, width: 2.5, height: 80, displayValue: true, fontSize: 14, margin: 12, lineColor: '#000', background: '#fff' });
+    document.getElementById('bc-actions').style.display = 'flex';
+  } catch(e) {
+    preview.innerHTML = '<p style="color:var(--red);font-size:13px;padding:8px;">Format incompatible avec la valeur saisie. Vérifiez la longueur et le contenu.</p>';
+    document.getElementById('bc-actions').style.display = 'none';
+  }
+}
+
+function downloadBarcode() {
+  const svg = document.getElementById('bc-svg');
+  if (!svg) return;
+  const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'code-barres.svg'; a.click();
+}
+
+function printBarcode() {
+  const svg = document.getElementById('bc-svg');
+  if (!svg) return;
+  const win = window.open('', '_blank');
+  win.document.write('<!DOCTYPE html><html><head><title>Code-barres</title></head><body style="text-align:center;padding:40px;font-family:sans-serif;"><h2 style="font-size:14px;margin-bottom:20px;">' + (document.getElementById('bc-value').value||'') + '</h2>' + svg.outerHTML + '</body></html>');
+  win.document.close(); win.focus(); setTimeout(() => win.print(), 500);
+}
+
+function populateBcSelect() {
+  const sel = document.getElementById('bc-article-sel');
+  sel.innerHTML = '<option value="">Choisir un article…</option>' + stock.map(i => `<option value="${i.id}">${i.name} — ${i.ref}</option>`).join('');
+}
+
+function generateFromArticle() {
+  const id = document.getElementById('bc-article-sel').value;
+  if (!id) { toast('Sélectionnez un article'); return; }
+  const item = stock.find(x => x.id === parseInt(id));
+  document.getElementById('bc-value').value = item.ref;
+  document.getElementById('bc-format').value = 'CODE128';
+  generateBarcode();
+}
+
+// ---- IMPORT / EXPORT ----
+function exportData() {
+  const data = { stock, movements, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'stockpro-export-' + new Date().toISOString().slice(0,10) + '.json'; a.click();
+  toast('Export téléchargé');
+}
+
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.stock) { stock = data.stock; nextId = Math.max(0, ...stock.map(i=>i.id)) + 1; }
+      if (data.movements) movements = data.movements;
+      save(); renderStock(); renderMvt();
+      toast('Import réussi — ' + stock.length + ' articles');
+    } catch(err) { toast('Fichier invalide'); }
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+// Init
+renderStock();
+renderMvt();
+</script>
+</body>
+</html>
